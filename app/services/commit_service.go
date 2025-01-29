@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/IBM/sarama"
+	"github.com/google/uuid"
 	"github.com/vantutran2k1-commits-collector/producer/app/constants"
+	"github.com/vantutran2k1-commits-collector/producer/app/models"
 	"github.com/vantutran2k1-commits-collector/producer/app/payloads"
 	"github.com/vantutran2k1-commits-collector/producer/app/repositories"
 	"github.com/vantutran2k1-commits-collector/producer/config"
@@ -43,6 +45,8 @@ func (s *commitService) Collect() ([]*payloads.CommitPayload, error) {
 		return nil, err
 	}
 
+	currentTime := time.Now().UTC()
+
 	var fromTime *time.Time
 	if latestJob != nil {
 		fromTime = &latestJob.CollectedFrom
@@ -52,21 +56,37 @@ func (s *commitService) Collect() ([]*payloads.CommitPayload, error) {
 		return nil, err
 	}
 
+	for _, commit := range commits {
+		event := payloads.CommitEvent{
+			CommitPayload: *commit,
+			CollectedAt:   currentTime.Format(constants.DateTimeFormat),
+		}
+		if err := s.sendToTopic(event); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := s.jobRepo.CreateJob(&models.CollectionJob{
+		Id:            uuid.New(),
+		CollectedFrom: currentTime,
+		CreatedAt:     currentTime,
+	}); err != nil {
+		return nil, err
+	}
+
 	return commits, nil
 }
 
 func (s *commitService) extractCommits(fromTime *time.Time) ([]*payloads.CommitPayload, error) {
 	url := fmt.Sprintf("%s?per_page=20&page={pageNumber}", config.AppEnv.GithubCommitsApi)
 	if fromTime != nil {
-		url = fmt.Sprintf("%s&since=%s", url, fromTime.Format("2006-01-02T15:04:05Z"))
+		url = fmt.Sprintf("%s&since=%s", url, fromTime.Format(constants.DateTimeFormat))
 	}
 
 	var commits []*payloads.CommitPayload
-	var current []*payloads.CommitPayload
 	page := 1
 	for {
 		currentUrl := strings.Replace(url, "{pageNumber}", strconv.Itoa(page), 1)
-		fmt.Printf("URL: %s\n", currentUrl)
 		req, err := http.NewRequest(http.MethodGet, currentUrl, nil)
 		if err != nil {
 			return nil, err
@@ -85,6 +105,7 @@ func (s *commitService) extractCommits(fromTime *time.Time) ([]*payloads.CommitP
 			return nil, errors.New("unexpected response from location API")
 		}
 
+		var current []*payloads.CommitPayload
 		if err := json.NewDecoder(resp.Body).Decode(&current); err != nil {
 			return nil, err
 		}
@@ -100,8 +121,8 @@ func (s *commitService) extractCommits(fromTime *time.Time) ([]*payloads.CommitP
 	return commits, nil
 }
 
-func (s *commitService) sendToTopic(payload payloads.CommitPayload) error {
-	messageBytes, err := json.Marshal(payload)
+func (s *commitService) sendToTopic(event payloads.CommitEvent) error {
+	messageBytes, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}

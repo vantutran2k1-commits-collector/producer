@@ -17,3 +17,8 @@ type CommitPayload struct {
 	NodeId string `json:"node_id"`
 	Commit Commit `json:"commit"`
 }
+
+type CommitEvent struct {
+	CommitPayload
+	CollectedAt string `json:"collected_at"`
+}
