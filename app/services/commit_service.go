@@ -18,7 +18,7 @@ import (
 )
 
 type CommitService interface {
-	Collect() ([]*payloads.CommitPayload, error)
+	Collect(fromTime *time.Time) ([]*payloads.CommitPayload, error)
 }
 
 func NewCommitService(
@@ -39,7 +39,7 @@ type commitService struct {
 	httpClient    *http.Client
 }
 
-func (s *commitService) Collect() ([]*payloads.CommitPayload, error) {
+func (s *commitService) Collect(fromTime *time.Time) ([]*payloads.CommitPayload, error) {
 	latestJob, err := s.jobRepo.GetLatestJob()
 	if err != nil {
 		return nil, err
@@ -47,8 +47,7 @@ func (s *commitService) Collect() ([]*payloads.CommitPayload, error) {
 
 	currentTime := time.Now().UTC()
 
-	var fromTime *time.Time
-	if latestJob != nil {
+	if latestJob != nil && fromTime == nil {
 		fromTime = &latestJob.CollectedFrom
 	}
 	commits, err := s.extractCommits(fromTime)
