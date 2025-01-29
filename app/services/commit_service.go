@@ -78,7 +78,7 @@ func (s *commitService) Collect() ([]*payloads.CommitPayload, error) {
 }
 
 func (s *commitService) extractCommits(fromTime *time.Time) ([]*payloads.CommitPayload, error) {
-	url := fmt.Sprintf("%s?per_page=20&page={pageNumber}", config.AppEnv.GithubCommitsApi)
+	url := fmt.Sprintf("%s?per_page=100&page={pageNumber}", config.AppEnv.GithubCommitsApi)
 	if fromTime != nil {
 		url = fmt.Sprintf("%s&since=%s", url, fromTime.Format(constants.DateTimeFormat))
 	}
