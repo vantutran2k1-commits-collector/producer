@@ -2,14 +2,21 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/vantutran2k1-commits-collector/producer/app/constants"
 	"github.com/vantutran2k1-commits-collector/producer/app/controllers"
+	"github.com/vantutran2k1-commits-collector/producer/app/repositories"
 	"github.com/vantutran2k1-commits-collector/producer/app/services"
 	"github.com/vantutran2k1-commits-collector/producer/config"
 )
 
+var r *Repositories
 var s *Services
 var c *Controllers
 var router *gin.Engine
+
+type Repositories struct {
+	CollectionJobRepository repositories.JobRepository
+}
 
 type Services struct {
 	CommitService services.CommitService
@@ -19,9 +26,18 @@ type Controllers struct {
 	CommitController controllers.CommitController
 }
 
-func setupServices() {
+func setupRepositories() {
+	r = &Repositories{
+		CollectionJobRepository: repositories.NewJobRepository(config.Db),
+	}
+}
+
+func setupServices(repositories *Repositories) {
 	s = &Services{
-		CommitService: services.NewCommitService(config.KafkaProducerClient),
+		CommitService: services.NewCommitService(
+			repositories.CollectionJobRepository,
+			config.KafkaProducerClient,
+		),
 	}
 }
 
@@ -32,7 +48,7 @@ func setupControllers(services *Services) {
 }
 
 func setupRouter() {
-	if config.AppEnv.GinMode == "release" {
+	if config.AppEnv.GinMode == constants.GinReleaseMode {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -46,7 +62,8 @@ func setupRouter() {
 }
 
 func setupRoutes() {
-	setupServices()
+	setupRepositories()
+	setupServices(r)
 	setupControllers(s)
 	setupRouter()
 }

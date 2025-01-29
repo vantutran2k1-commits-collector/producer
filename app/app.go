@@ -18,6 +18,7 @@ func InitApp() *CollectorApp {
 	}
 
 	config.InitAppEnv()
+	config.InitDb()
 	config.InitKafkaProducerClient()
 
 	router := routes.RegisterRoutes()
